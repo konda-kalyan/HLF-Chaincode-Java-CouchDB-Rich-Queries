@@ -1,0 +1,8 @@
+{
+  "index":{
+      "fields":["department", "location"]
+  },
+  "ddoc":"index2Doc",
+  "name":"departmentLocationIndex",
+  "type":"json"
+}
