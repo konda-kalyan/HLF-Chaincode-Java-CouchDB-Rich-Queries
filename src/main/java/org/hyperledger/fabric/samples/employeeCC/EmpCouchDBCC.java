@@ -65,7 +65,22 @@ public final class EmpCouchDBCC extends ChaincodeBase {
     
     @Override
     public Response init(ChaincodeStub stub) {
-        return newSuccessResponse(responseSuccess("Init"));
+        
+    	// Initialize ledger with some initial/dummy values
+    	List<String> args = stub.getParameters();
+    	
+    	if (args.size() != 5)	// Employee(long empID, String empName, String department, double salary, String location) 
+            return newErrorResponse(responseError("addEmployee: Incorrect number of arguments, expecting 5", ""));
+        
+        String key = args.get(0);
+        Employee employee = new Employee("0", "Dummy", "Dummy", 0.0, "Dummy");
+        
+        try {
+            stub.putState(key, (new ObjectMapper()).writeValueAsBytes(employee));
+            return newSuccessResponse(responseSuccess("init: Dummy Employee added"));
+        } catch (Throwable e) {
+            return newErrorResponse(responseError(e.getMessage(), ""));
+        }
     }
     
     @Override
