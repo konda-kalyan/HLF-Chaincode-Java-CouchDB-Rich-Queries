@@ -70,10 +70,11 @@ public final class EmpCouchDBCC extends ChaincodeBase {
     	List<String> args = stub.getParameters();
     	
     	if (args.size() != 5)	// Employee(long empID, String empName, String department, double salary, String location) 
-            return newErrorResponse(responseError("addEmployee: Incorrect number of arguments, expecting 5", ""));
+            return newErrorResponse(responseError("init: Incorrect number of arguments, expecting 5", ""));
         
         String key = args.get(0);
-        Employee employee = new Employee("0", "Dummy", "Dummy", 0.0, "Dummy");
+        //Employee employee = new Employee(key, "Dummy", "Dummy", 0.0, "Dummy");
+        Employee employee = new Employee(key, args.get(1), args.get(2), Double.parseDouble(args.get(0)), args.get(4));
         
         try {
             stub.putState(key, (new ObjectMapper()).writeValueAsBytes(employee));
@@ -104,7 +105,7 @@ public final class EmpCouchDBCC extends ChaincodeBase {
             return newErrorResponse(responseError("addEmployee: Incorrect number of arguments, expecting 5", ""));
         
         String key = args.get(0);
-        Employee employee = new Employee(args.get(0), args.get(1), args.get(2), Double.parseDouble(args.get(0)), args.get(4));
+        Employee employee = new Employee(key, args.get(1), args.get(2), Double.parseDouble(args.get(0)), args.get(4));
         
         try {
             if(checkString(stub.getStringState(key)))
@@ -163,5 +164,10 @@ public final class EmpCouchDBCC extends ChaincodeBase {
             }
         }
         return result.concat("]");
+    }
+
+    public static void main(String[] args) {
+        //System.out.println("OpenSSL avaliable: " + OpenSsl.isAvailable());
+        new EmpCouchDBCC().start(args);
     }
 }
