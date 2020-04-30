@@ -2,7 +2,7 @@
   "index":{
       "fields":["department", "location"]
   },
-  "ddoc":"index2Doc",
+  "ddoc":"departmentLocationIndexDoc",
   "name":"departmentLocationIndex",
   "type":"json"
 }

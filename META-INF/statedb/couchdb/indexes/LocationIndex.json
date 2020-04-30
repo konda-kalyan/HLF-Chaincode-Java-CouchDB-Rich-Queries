@@ -2,7 +2,7 @@
   "index":{
       "fields":["location"]
   },
-  "ddoc":"index1Doc",
+  "ddoc":"locationIndexDoc",
   "name":"locationIndex",
   "type":"json"
 }

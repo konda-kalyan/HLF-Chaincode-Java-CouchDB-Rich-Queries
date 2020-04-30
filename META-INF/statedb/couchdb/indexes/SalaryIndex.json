@@ -1,0 +1,8 @@
+{
+  "index":{
+      "fields":["salary"]
+  },
+  "ddoc":"salaryIndexDoc",
+  "name":"salaryIndex",
+  "type":"json"
+}
