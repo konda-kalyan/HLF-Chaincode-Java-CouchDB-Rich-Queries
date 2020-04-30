@@ -16,4 +16,7 @@ Rich queries:
   4.	Get employees whose employee IDs are in given range (this is regular query operation which also works in LevelDB)
   5.	Pagination: Get 3 employees at a time
 
+
+Refer scripts/install_instantiate_invoke_couchdb_java_chaincode.sh	for CLI peer chaincode commands
+
 Queries - Contact at 'konda.kalyan@gmail.com'

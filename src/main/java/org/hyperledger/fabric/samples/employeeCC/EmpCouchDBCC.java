@@ -7,6 +7,7 @@ import org.hyperledger.fabric.shim.ChaincodeStub;
 import org.hyperledger.fabric.shim.ledger.KeyValue;
 import org.hyperledger.fabric.shim.ledger.QueryResultsIterator;
 import org.hyperledger.fabric.shim.ledger.QueryResultsIteratorWithMetadata;
+import org.hyperledger.fabric.shim.ledger.KeyModification;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -61,7 +62,9 @@ public final class EmpCouchDBCC extends ChaincodeBase {
             return addEmployee(stub, params);
         else if (funName.equals("queryEmployee"))
             return queryEmployee(stub, params);
-        else if (funName.equals("queryEmpBySalaryGreaterThanXAmount"))
+        else if (funName.equals("updateEmployee"))
+            return updateEmployee(stub, params);
+		else if (funName.equals("queryEmpBySalaryGreaterThanXAmount"))
             return queryEmpBySalaryGreaterThanXAmount(stub, params);
         else if (funName.equals("queryEmployees"))
             return queryEmployees(stub, params);
@@ -69,6 +72,8 @@ public final class EmpCouchDBCC extends ChaincodeBase {
             return queryEmpsByGivenEmpIDRange(stub, params);
 		else if (funName.equals("queryEmpBySalaryGreaterThanXAmountWithPagination"))
             return queryEmpBySalaryGreaterThanXAmountWithPagination(stub, params);
+		else if (funName.equals("getHistoryForKey"))
+            return getHistoryForKey(stub, params);
 		
 		return newErrorResponse(responseError("Unsupported method", ""));
     }
@@ -91,7 +96,58 @@ public final class EmpCouchDBCC extends ChaincodeBase {
             return newErrorResponse(responseError(e.getMessage(), ""));
         }
     }
+	
+	private Response updateEmployee(ChaincodeStub stub, List<String> args) {
+    	
+		// Employee(long empID, String empName, String department, double salary, String location)
+        if (args.size() != 5)
+            return newErrorResponse(responseError("updateEmployee: Incorrect number of arguments, expecting 5", ""));
+        
+        String key = args.get(0);
+        Employee employee = new Employee(key, args.get(1), args.get(2), Double.parseDouble(args.get(3)), args.get(4));
+        
+        try {
+			String existingDoc = stub.getStringState(key);
+            if(! checkString(existingDoc)) {
+                return newErrorResponse(responseError("updateEmployee: Employee does not exists with employee ID: " + key, ""));
+			} else {
+				System.out.println("Kalyan: updateEmployee: existing employee  " + existingDoc);
+			}
+			System.out.println("Kalyan: updateEmployee: new employee name " + employee.getEmpName());
+            stub.putState(key, (new ObjectMapper()).writeValueAsBytes(employee));
+            return newSuccessResponse(responseSuccess("updateEmployee: Employeed updated"));
+        } catch (Throwable e) {
+            return newErrorResponse(responseError(e.getMessage(), ""));
+        }
+    }
     
+	// Normal regular query (not a rich query)
+    private Response getHistoryForKey(ChaincodeStub stub, List<String> args) {
+    	
+		// args(0) - empID (nothing but key)
+        if (args.size() != 1)
+            return newErrorResponse(responseError("queryEmployee: Incorrect number of arguments, expecting 1", ""));
+            
+        try {
+			QueryResultsIterator<KeyModification> results = stub.getHistoryForKey(args.get(0));
+			
+			String queryResult = "[";
+			while (results.iterator().hasNext()) {
+				KeyModification km = results.iterator().next();
+				if(km != null) {
+					queryResult = queryResult.concat("Values = " + km.getStringValue() + ", Timestamp = " + km.getTimestamp() + ", TransactionId = " + km.getTxId() + ", isDeleted = " + km.isDeleted());
+					if (results.iterator().hasNext())
+						queryResult = queryResult.concat(";;;");
+				}
+			}
+			queryResult.concat("]");
+            System.out.println("Kalyan: queryEmpBySalaryGreaterThanXAmount: queryResult: " + queryResult);
+            return newSuccessResponse((new ObjectMapper()).writeValueAsBytes(responseSuccessObject(queryResult)));
+        } catch(Throwable e){
+            return newErrorResponse(responseError(e.getMessage(), ""));
+        }
+    }
+	
 	// Normal regular query (not a rich query)
     private Response queryEmployee(ChaincodeStub stub, List<String> args) {
     	
