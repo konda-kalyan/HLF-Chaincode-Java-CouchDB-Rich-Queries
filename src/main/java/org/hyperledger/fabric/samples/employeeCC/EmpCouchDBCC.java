@@ -6,6 +6,7 @@ import org.hyperledger.fabric.shim.ChaincodeBase;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 import org.hyperledger.fabric.shim.ledger.KeyValue;
 import org.hyperledger.fabric.shim.ledger.QueryResultsIterator;
+import org.hyperledger.fabric.shim.ledger.QueryResultsIteratorWithMetadata;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -27,15 +28,6 @@ public final class EmpCouchDBCC extends ChaincodeBase {
             this.OK = OK;
         }
     }
-
-     /**
-     * Chaincode 'init()' which gets called during Chaincode instantiation.
-     *
-     * @param ctx the transaction context
-     * @param key the key for the new Order
-     * @param Order JSON String
-     * @return the stored Order
-     */
     
     @Override
     public Response init(ChaincodeStub stub) {
@@ -60,19 +52,25 @@ public final class EmpCouchDBCC extends ChaincodeBase {
     
     @Override
     public Response invoke(ChaincodeStub stub) {
-        String func = stub.getFunction();
-        List<String> params = stub.getParameters();
-        if (func.equals("addEmployee"))
+		
+		List<String> params = stub.getParameters();
+		
+        String funName = stub.getFunction();
+				
+        if (funName.equals("addEmployee"))
             return addEmployee(stub, params);
-        else if (func.equals("queryEmployee"))
+        else if (funName.equals("queryEmployee"))
             return queryEmployee(stub, params);
-        else if (func.equals("queryEmpBySalaryGreaterThanXAmount"))
+        else if (funName.equals("queryEmpBySalaryGreaterThanXAmount"))
             return queryEmpBySalaryGreaterThanXAmount(stub, params);
-        else if (func.equals("queryEmployees"))
+        else if (funName.equals("queryEmployees"))
             return queryEmployees(stub, params);
-//        else if (func.equals("getWalletsWithTokenAmountGreaterThan"))
-//            return getWalletsWithTokenAmountGreaterThan(stub, params);
-        return newErrorResponse(responseError("Unsupported method", ""));
+		else if (funName.equals("queryEmpsByGivenEmpIDRange"))
+            return queryEmpsByGivenEmpIDRange(stub, params);
+		else if (funName.equals("queryEmpBySalaryGreaterThanXAmountWithPagination"))
+            return queryEmpBySalaryGreaterThanXAmountWithPagination(stub, params);
+		
+		return newErrorResponse(responseError("Unsupported method", ""));
     }
     
     private Response addEmployee(ChaincodeStub stub, List<String> args) {
@@ -117,15 +115,46 @@ public final class EmpCouchDBCC extends ChaincodeBase {
 		// args(0) - salary
         if (args.size() != 1)
             return newErrorResponse(responseError("queryEmpBySalaryGreaterThanXAmount: Incorrect number of arguments, expecting 1", ""));
-        
-        String salaryStr = args.get(0);
 
         try {
-            double salary = Double.parseDouble(salaryStr);
+            double salary = Double.parseDouble(args.get(0));
 			System.out.println("Kalyan: queryEmpBySalaryGreaterThanXAmount: input salary amount: " + salary);
             String queryStr = "{ \"selector\": { \"salary\": { \"$gt\": " + salary + " } }, \"use_index\":[\"_design/salaryIndexDoc\", \"salaryIndex\"] }";	// * always recommed to mention 'use_index'
             String queryResult = query(stub, queryStr);
 			System.out.println("Kalyan: queryEmpBySalaryGreaterThanXAmount: queryResult: " + queryResult);
+            return newSuccessResponse((new ObjectMapper()).writeValueAsBytes(responseSuccessObject(queryResult)));
+        } catch(Throwable e){
+            return newErrorResponse(responseError(e.getMessage(), ""));
+        }
+    }
+	
+	// Parametarized rich query (prepare query string in this values)
+    private Response queryEmpBySalaryGreaterThanXAmountWithPagination(ChaincodeStub stub, List<String> args) {
+    	
+		// args(0) - salary
+		// args(1) - pagesize
+		// args(2) - bookmark
+        if (args.size() != 3)
+            return newErrorResponse(responseError("queryEmpBySalaryGreaterThanXAmountWithPagination: Incorrect number of arguments, expecting 3", ""));
+
+        try {
+            double salary = Double.parseDouble(args.get(0));
+			System.out.println("Kalyan: queryEmpBySalaryGreaterThanXAmountWithPagination: input salary amount: " + salary);
+            String queryStr = "{ \"selector\": { \"salary\": { \"$gt\": " + salary + " } }, \"use_index\":[\"_design/salaryIndexDoc\", \"salaryIndex\"] }";	// * always recommed to mention 'use_index'
+            QueryResultsIteratorWithMetadata<KeyValue> results = stub.getQueryResultWithPagination(queryStr, Integer.parseInt(args.get(1)), args.get(2));
+			
+			String queryResult = "[";
+			while (results.iterator().hasNext()) {
+				String v = results.iterator().next().getStringValue();
+				if(v != null && v.trim().length() > 0) {
+					queryResult = queryResult.concat(v);
+					if (results.iterator().hasNext())
+						queryResult = queryResult.concat(",");
+				}
+			}
+			queryResult.concat("]");
+			
+			System.out.println("Kalyan: queryEmpBySalaryGreaterThanXAmountWithPagination: queryResult: " + queryResult);
             return newSuccessResponse((new ObjectMapper()).writeValueAsBytes(responseSuccessObject(queryResult)));
         } catch(Throwable e){
             return newErrorResponse(responseError(e.getMessage(), ""));
@@ -137,14 +166,43 @@ public final class EmpCouchDBCC extends ChaincodeBase {
     	
 		// args(0) - query string
         if (args.size() != 1)
-            return newErrorResponse(responseError("queryEmpBySalaryGreaterThanXAmount: Incorrect number of arguments, expecting 1", ""));
+            return newErrorResponse(responseError("queryEmployees: Incorrect number of arguments, expecting 1", ""));
         
         String queryString = args.get(0);
 
         try {
 			// just use as it is we receive from client
             String queryResult = query(stub, queryString);
-			System.out.println("Kalyan: queryEmpBySalaryGreaterThanXAmount: queryResult: " + queryResult);
+			System.out.println("Kalyan: queryEmployees: queryResult: " + queryResult);
+            return newSuccessResponse((new ObjectMapper()).writeValueAsBytes(responseSuccessObject(queryResult)));
+        } catch(Throwable e){
+            return newErrorResponse(responseError(e.getMessage(), ""));
+        }
+    }
+	
+	// Parametarized rich query (prepare query string in this values)
+    private Response queryEmpsByGivenEmpIDRange(ChaincodeStub stub, List<String> args) {
+    	
+		// args(0) - start key
+		// args(1) - end key
+        if (args.size() != 2)
+            return newErrorResponse(responseError("queryEmpsByGivenEmpIDRange: Incorrect number of arguments, expecting 2", ""));
+
+        try {
+            QueryResultsIterator<KeyValue> results = stub.getStateByRange(args.get(0), args.get(1)); // Important Note: getStateByRange() - Returns all existing keys, and their values, that are lexicographically between startkey (inclusive) and the endKey (exclusive). Catch is endKey is exclusive
+			
+			String queryResult = "[";
+			while (results.iterator().hasNext()) {
+				String v = results.iterator().next().getStringValue();
+				if(v != null && v.trim().length() > 0) {
+					queryResult = queryResult.concat(v);
+					if (results.iterator().hasNext())
+						queryResult = queryResult.concat(",");
+				}
+			}
+			queryResult.concat("]");
+			
+			System.out.println("Kalyan: queryEmpsByGivenEmpIDRange: queryResult: " + queryResult);
             return newSuccessResponse((new ObjectMapper()).writeValueAsBytes(responseSuccessObject(queryResult)));
         } catch(Throwable e){
             return newErrorResponse(responseError(e.getMessage(), ""));
